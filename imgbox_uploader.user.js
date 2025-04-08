@@ -18,6 +18,53 @@
     
     // 添加全局样式
     GM_addStyle(`
+        /* 浮动通知样式 */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+        }
+        
+        .toast {
+            background-color: #333;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            animation: fadeIn 0.3s, fadeOut 0.3s 2.7s;
+            opacity: 0;
+            max-width: 300px;
+        }
+        
+        .toast.success {
+            background-color: #4CAF50;
+            border-left: 5px solid #45a049;
+        }
+        
+        .toast.error {
+            background-color: #f44336;
+            border-left: 5px solid #d32f2f;
+        }
+        
+        .toast.info {
+            background-color: #2196F3;
+            border-left: 5px solid #1976D2;
+        }
+        
+        @keyframes fadeIn {
+            from {opacity: 0; transform: translateY(-20px);}
+            to {opacity: 1; transform: translateY(0);}
+        }
+        
+        @keyframes fadeOut {
+            from {opacity: 1; transform: translateY(0);}
+            to {opacity: 0; transform: translateY(-20px);}
+        }
+        
         /* 暗色主题样式 */
         #floating-button {
             position: fixed;
@@ -523,7 +570,7 @@
         
         const bbcode = bbcodeInput.value.trim();
         if (!bbcode) {
-            alert('请输入包含[IMG]标签的BB代码！');
+            showToast('请输入包含[IMG]标签的BB代码！', 'error');
             return;
         }
         
@@ -568,7 +615,7 @@
         const bbCodeElements = document.querySelectorAll('textarea[id="code-bb-full"]');
                 
         if (bbCodeElements.length === 0) {
-            alert('未在页面上找到BB代码文本框！');
+            showToast('未在页面上找到BB代码文本框！', 'error');
             return;
         }
         
@@ -585,7 +632,7 @@
         }
         
         if (!bbCode) {
-            alert('未在页面上找到包含[IMG]标签的BB代码！');
+            showToast('未在页面上找到包含[IMG]标签的BB代码！', 'error');
             return;
         }
         
@@ -604,7 +651,7 @@
         const links = Array.from(extractedLinksArea.querySelectorAll('a')).map(a => a.href);
         
         if (links.length === 0) {
-            alert('没有可复制的链接！');
+            showToast('没有可复制的链接！', 'error');
             return;
         }
         
@@ -871,11 +918,41 @@
         const links = Array.from(resultArea.querySelectorAll('a')).map(a => a.href);
         
         if (links.length === 0) {
-            alert('没有可复制的链接！');
+            showToast('没有可复制的链接！', 'error');
             return;
         }
         
         copyToClipboard(links.join('\n'));
+    }
+    
+    // 显示通知
+    function showToast(message, type = 'info', duration = 3000) {
+        // 创建或获取通知容器
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            document.body.appendChild(container);
+        }
+        
+        // 创建通知元素
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        toast.style.opacity = '1';
+        container.appendChild(toast);
+        
+        // 定时移除通知
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => {
+                container.removeChild(toast);
+                // 如果没有通知了，移除容器
+                if (container.childNodes.length === 0) {
+                    document.body.removeChild(container);
+                }
+            }, 300);
+        }, duration);
     }
     
     // 复制到剪贴板
@@ -889,12 +966,12 @@
         try {
             const successful = document.execCommand('copy');
             if (successful) {
-                alert(`已复制 ${text.split('\n').length} 个链接到剪贴板！`);
+                showToast(`已复制 ${text.split('\n').length} 个链接到剪贴板！`, 'success');
             } else {
-                alert('复制失败，请手动复制链接。');
+                showToast('复制失败，请手动复制链接。', 'error');
             }
         } catch (err) {
-            alert('复制失败，请手动复制链接。');
+            showToast('复制失败，请手动复制链接。', 'error');
         }
         
         document.body.removeChild(textarea);
