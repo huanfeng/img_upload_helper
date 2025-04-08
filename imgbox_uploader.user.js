@@ -28,6 +28,15 @@
             text-align: center;
         }
         
+        /* 导航栏图标样式 */
+        .helper-icon {
+            display: inline-block;
+            margin-right: 5px;
+            width: 16px;
+            height: 16px;
+            vertical-align: middle;
+        }
+        
         .toast {
             background-color: #333;
             color: white;
@@ -127,6 +136,10 @@
         
         #custom-imgbox-container button.red-btn {
             background-color: #f44336;
+        }
+        
+        #custom-imgbox-container button.gray-btn {
+            background-color: #444;
         }
         
         #imgbox-status {
@@ -249,12 +262,12 @@
         }
     `);
     
-    // 页面加载完成后执行
+    // 监听页面加载
     window.addEventListener('load', function() {
         // 检查是否在imgbox网站
         if (window.location.hostname.includes('imgbox.com')) {
-            // 添加浮动按钮
-            addFloatingButton();
+            // 初始化脚本
+            init();
             
             // 检查是否有从其他页面传递过来的图片链接
             const imageLinks = GM_getValue('HDB_images', '');
@@ -269,32 +282,43 @@
                     addImgboxUI(imageLinks);
                     // 显示界面
                     document.getElementById('custom-imgbox-container').style.display = 'block';
+                    GM_setValue('uiVisible', true);
                     // 激活上传标签页
                     activateTab('upload-tab');
                 }, 1000);
-            } else {
-                // 没有传递的链接，也添加UI但不显示
-                addImgboxUI('');
             }
-            
-            // 监听上传结果
-            monitorUploadResults();
         }
     });
     
     // 将助手按钮添加到导航栏
-    function addFloatingButton() {
+    // 初始化脚本
+    function init() {
         // 等待导航栏加载
         const waitForNav = setInterval(() => {
             const navUl = document.querySelector('.nav.pull-right');
             if (navUl) {
                 clearInterval(waitForNav);
                 
+                // 获取保存的UI显示状态
+                const uiVisible = GM_getValue('uiVisible', false);
+                
                 // 创建新的导航项
                 const navItem = document.createElement('li');
                 const navLink = document.createElement('a');
                 navLink.href = 'javascript:void(0);';
-                navLink.textContent = '图片助手';
+                
+                // 创建图标
+                const icon = document.createElement('span');
+                icon.className = 'helper-icon';
+                icon.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="M21 15l-5-5L5 21" />
+                </svg>`;
+                
+                // 添加图标和文本
+                navLink.appendChild(icon);
+                navLink.appendChild(document.createTextNode('图片助手'));
                 navLink.title = '打开图片上传助手';
                 navLink.style.color = '#4CAF50'; // 使其稍微突出
                 
@@ -302,14 +326,19 @@
                     e.preventDefault();
                     const customContainer = document.getElementById('custom-imgbox-container');
                     if (customContainer) {
-                        if (customContainer.style.display === 'none') {
-                            customContainer.style.display = 'block';
-                        } else {
-                            customContainer.style.display = 'none';
-                        }
+                        // 切换显示状态
+                        const newDisplayState = customContainer.style.display === 'none' ? 'block' : 'none';
+                        customContainer.style.display = newDisplayState;
+                        
+                        // 保存状态
+                        GM_setValue('uiVisible', newDisplayState === 'block');
+                        
+                        // 更新图标颜色
+                        navLink.style.color = newDisplayState === 'block' ? '#4CAF50' : '#999';
                     } else {
                         // 初次创建界面
                         addImgboxUI();
+                        GM_setValue('uiVisible', true);
                     }
                 };
                 
@@ -317,6 +346,18 @@
                 
                 // 将导航项添加到导航栏
                 navUl.appendChild(navItem);
+                
+                // 根据保存的UI状态设置导航栏图标颜色
+                if (uiVisible) {
+                    navLink.style.color = '#4CAF50';
+                } else {
+                    navLink.style.color = '#999';
+                }
+                
+                // 如果之前设置了显示，则自动创建界面
+                if (uiVisible) {
+                    addImgboxUI();
+                }
             }
         }, 100);
     }
@@ -341,12 +382,6 @@
         if (selectedTab) {
             selectedTab.classList.add('active');
             selectedTab.style.display = 'block';
-            
-            // 添加渐变动画效果
-            selectedTab.style.opacity = '0';
-            setTimeout(() => {
-                selectedTab.style.opacity = '1';
-            }, 10);
         }
         
         // 激活对应的标签按钮
@@ -358,6 +393,27 @@
         
         // 将当前标签页ID保存到本地存储
         GM_setValue('activeTab', tabId);
+    }
+    
+    // 检测页面类型并选择默认标签页
+    function detectPageTypeAndSetDefaultTab() {
+        // 检测是否有 BBCode 内容
+        const hasBBCode = document.body.textContent.includes('[img]') || 
+                          document.body.textContent.includes('[IMG]');
+        
+        // 如果有BBCode内容，默认打开提取标签页
+        if (hasBBCode) {
+            return 'extract-tab';
+        }
+        
+        // 如果是上传页面
+        if (document.querySelector('form[action*="upload"]') || 
+            document.querySelector('input[type="file"]')) {
+            return 'upload-tab';
+        }
+        
+        // 如果都不是，返回上次保存的标签页或默认值
+        return GM_getValue('activeTab', 'upload-tab');
     }
     
     // 添加Imgbox界面UI
@@ -375,7 +431,10 @@
         // 创建自定义UI容器
         const customContainer = document.createElement('div');
         customContainer.id = 'custom-imgbox-container';
-        customContainer.style.display = 'none'; // 默认隐藏
+        
+        // 根据保存的状态决定是否显示
+        const uiVisible = GM_getValue('uiVisible', false);
+        customContainer.style.display = uiVisible ? 'block' : 'none';
         
         // 创建标签页容器
         const tabContainer = document.createElement('div');
@@ -410,13 +469,13 @@
         // 创建上传标签内容
         const uploadTabContent = document.createElement('div');
         uploadTabContent.id = 'upload-tab';
-        uploadTabContent.className = 'tab-content active';
+        uploadTabContent.className = 'tab-content';
         tabContainer.appendChild(uploadTabContent);
         
         // 创建链接输入区域
         const inputLabel = document.createElement('div');
         inputLabel.textContent = '请输入图片链接（每行一个）:';
-        inputLabel.style.marginBottom = '5px';
+        inputLabel.className = 'section-title';
         uploadTabContent.appendChild(inputLabel);
         
         const linksInput = document.createElement('textarea');
@@ -463,14 +522,32 @@
         formatContainer.appendChild(formatSelect);
         uploadTabContent.appendChild(formatContainer);
         
+        // 创建按钮容器
+        const uploadButtonContainer = document.createElement('div');
+        uploadButtonContainer.style.cssText = 'display: flex; gap: 10px; margin-top: 10px;';
+        uploadTabContent.appendChild(uploadButtonContainer);
+        
         // 创建下载按钮
         const downloadButton = document.createElement('button');
         downloadButton.textContent = '下载图片并添加到上传列表';
         downloadButton.type = 'button'; // 防止触发表单提交
+        downloadButton.className = 'orange-btn';
         downloadButton.onclick = function() {
             processImageLinks(linksInput.value);
         };
-        uploadTabContent.appendChild(downloadButton);
+        uploadButtonContainer.appendChild(downloadButton);
+        
+        // 创建清空按钮
+        const clearUploadButton = document.createElement('button');
+        clearUploadButton.textContent = '清空';
+        clearUploadButton.type = 'button';
+        clearUploadButton.className = 'gray-btn';
+        clearUploadButton.onclick = function() {
+            linksInput.value = '';
+            const statusDiv = document.getElementById('imgbox-status');
+            if (statusDiv) statusDiv.innerHTML = '';
+        };
+        uploadButtonContainer.appendChild(clearUploadButton);
         
         // 创建状态显示区域
         const statusDiv = document.createElement('div');
@@ -496,6 +573,7 @@
         
         // 创建按钮容器
         const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = 'display: flex; gap: 10px; margin-top: 10px;';
         extractTabContent.appendChild(buttonContainer);
         
         // 创建提取按钮
@@ -510,7 +588,7 @@
         
         // 创建自动获取按钮
         const autoGetButton = document.createElement('button');
-        autoGetButton.textContent = '从页面获取BB Full代码';
+        autoGetButton.textContent = '从页面BB-Code获取大图直链';
         autoGetButton.type = 'button';
         autoGetButton.className = 'blue-btn';
         autoGetButton.onclick = function() {
@@ -528,29 +606,48 @@
         extractedLinksArea.id = 'imgbox-extracted-links';
         extractTabContent.appendChild(extractedLinksArea);
         
+        // 创建按钮容器
+        const extractButtonContainer = document.createElement('div');
+        extractButtonContainer.style.cssText = 'display: flex; gap: 10px; margin-top: 10px;';
+        extractTabContent.appendChild(extractButtonContainer);
+        
         // 创建复制提取结果按钮
         const copyExtractedButton = document.createElement('button');
-        copyExtractedButton.textContent = '复制提取的链接';
+        copyExtractedButton.textContent = '复制链接';
         copyExtractedButton.type = 'button';
         copyExtractedButton.className = 'blue-btn';
         copyExtractedButton.onclick = function() {
             copyExtractedLinks();
         };
-        extractTabContent.appendChild(copyExtractedButton);
+        extractButtonContainer.appendChild(copyExtractedButton);
+        
+        // 创建清空按钮
+        const clearAllButton = document.createElement('button');
+        clearAllButton.textContent = '清空';
+        clearAllButton.type = 'button';
+        clearAllButton.className = 'gray-btn';
+        clearAllButton.onclick = function() {
+            extractTextarea.value = '';
+            const extractResultsDiv = document.getElementById('extract-results');
+            const extractedLinksArea = document.getElementById('imgbox-extracted-links');
+            if (extractResultsDiv) extractResultsDiv.innerHTML = '';
+            if (extractedLinksArea) extractedLinksArea.innerHTML = '';
+        };
+        extractButtonContainer.appendChild(clearAllButton);
         
         // 将自定义容器插入到上传表单之前
         uploadForm.parentNode.insertBefore(customContainer, uploadForm);
         
         // 如果有初始链接，自动处理
-        if (initialLinks.trim()) {
+        if (initialLinks && typeof initialLinks === 'string' && initialLinks.trim()) {
             setTimeout(() => {
                 processImageLinks(initialLinks);
             }, 1500);
         }
         
-        // 初始化激活默认标签页
-        const savedTab = GM_getValue('activeTab', 'upload-tab');
-        activateTab(savedTab);
+        // 检测页面类型并设置默认标签页
+        const defaultTabId = detectPageTypeAndSetDefaultTab();
+        activateTab(defaultTabId);
     }
     
     // 处理图片链接
@@ -578,6 +675,7 @@
         
         // 先收集所有文件
         statusDiv.textContent = `开始处理 ${links.length} 个图片链接...`;
+        statusDiv.style.color = '#4CAF50'; // 设置为统一的颜色
         const files = [];
         
         for (let i = 0; i < links.length; i++) {
@@ -585,12 +683,14 @@
             if (!link) continue;
             
             statusDiv.textContent = `下载第 ${i+1}/${links.length} 个图片: ${link}`;
+            statusDiv.style.color = '#4CAF50'; // 设置为统一的颜色
             
             try {
                 // 下载图片
                 const file = await getImage(link);
                 files.push(file);
                 statusDiv.textContent = `已下载 ${files.length}/${links.length} 张图片`;
+            statusDiv.style.color = '#4CAF50'; // 设置为统一的颜色
             } catch (error) {
                 console.error(`下载链接 ${link} 失败:`, error);
                 statusDiv.textContent = `下载链接 ${link} 失败: ${error.message}`;
@@ -605,6 +705,7 @@
         
         // 一次性添加所有文件到输入框
         statusDiv.textContent = `正在添加 ${files.length} 张图片到上传列表...`;
+        statusDiv.style.color = '#4CAF50'; // 设置为统一的颜色
         addFilesToInput(fileInput, files);
         
         statusDiv.textContent = `已添加 ${files.length} 张图片到上传列表，请点击网站的上传按钮开始上传`;
