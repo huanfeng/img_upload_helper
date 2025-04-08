@@ -2,8 +2,8 @@
 // @name         Imgbox图片上传助手增强版
 // @namespace    http://tampermonkey.net/
 // @version      0.5
-// @description  在imgbox界面添加图片链接输入框，自动下载并填充到上传列表，解析上传结果，支持暗色主题、浮窗和TAB分页
-// @author       You
+// @description  给 imgbox 添加在线链接上传功能, 支持图片格式转换, 添加直链获取功能
+// @author       huanfeng
 // @match        *://imgbox.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
@@ -11,6 +11,8 @@
 // @grant        unsafeWindow
 // @grant        GM_addStyle
 // @connect      *
+// @homepage     https://github.com/huanfeng/imgbox_upload_helper
+// @license MIT
 // ==/UserScript==
 
 (function() {
