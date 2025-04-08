@@ -477,17 +477,6 @@
         statusDiv.id = 'imgbox-status';
         uploadTabContent.appendChild(statusDiv);
         
-        // 创建结果区域
-        const resultLabel = document.createElement('div');
-        resultLabel.textContent = '上传结果:';
-        resultLabel.className = 'section-title';
-        uploadTabContent.appendChild(resultLabel);
-        
-        const resultArea = document.createElement('div');
-        resultArea.id = 'imgbox-results';
-        uploadTabContent.appendChild(resultArea);
-        
-        
         // 创建提取标签内容
         const extractTabContent = document.createElement('div');
         extractTabContent.id = 'extract-tab';
@@ -888,80 +877,6 @@
                 return false;
             }
         }
-    }
-    
-    // 监控上传结果
-    function monitorUploadResults() {
-        // 创建一个MutationObserver来监听DOM变化
-        const observer = new MutationObserver(function(mutations) {
-            // 检查是否有上传完成的图片
-            const uploadedImages = document.querySelectorAll('.image-container, .gallery-image, .thumbnail');
-            
-            if (uploadedImages.length > 0) {
-                const resultArea = document.getElementById('imgbox-results');
-                if (!resultArea) return;
-                
-                // 清空结果区域
-                resultArea.innerHTML = '';
-                
-                // 收集所有图片链接
-                uploadedImages.forEach(function(imgContainer) {
-                    // 尝试找到图片链接
-                    const linkElement = imgContainer.querySelector('a[href*="imgbox.com"]');
-                    if (linkElement) {
-                        const imageUrl = linkElement.href;
-                        // 获取大图链接
-                        const directLink = convertToDirectLink(imageUrl);
-                        
-                        // 创建结果项
-                        const resultItem = document.createElement('div');
-                        resultItem.className = 'result-item';
-                        resultItem.innerHTML = `
-                            <div style="display: flex; align-items: center;">
-                                <img src="${directLink}" alt="上传图片">
-                                <a href="${directLink}" target="_blank">${directLink}</a>
-                            </div>
-                        `;
-                        resultArea.appendChild(resultItem);
-                    }
-                });
-                
-                // 显示自定义UI
-                const customContainer = document.getElementById('custom-imgbox-container');
-                if (customContainer && customContainer.style.display === 'none') {
-                    customContainer.style.display = 'block';
-                }
-            }
-        });
-        
-        // 开始观察整个文档的变化
-        observer.observe(document.body, { 
-            childList: true, 
-            subtree: true 
-        });
-    }
-    
-    // 将imgbox页面链接转换为直接图片链接
-    function convertToDirectLink(pageUrl) {
-        // 从页面URL中提取ID
-        const idMatch = pageUrl.match(/imgbox\.com\/([a-zA-Z0-9]+)/);
-        if (!idMatch) return pageUrl;
-        
-        const id = idMatch[1];
-        
-        // 尝试从页面中查找实际图片
-        const imgElement = document.querySelector(`a[href*="${id}"] img, img[src*="${id}"]`);
-        if (imgElement && imgElement.src) {
-            // 如果找到图片元素，使用其src属性
-            const src = imgElement.src;
-            // 将缩略图URL转换为大图URL
-            return src.replace('thumbs', 'images').replace('_t.', '_o.');
-        }
-        
-        // 如果无法从页面中找到，构建一个可能的URL
-        // 这里需要根据imgbox的实际URL格式进行调整
-        const firstTwoChars = id.substring(0, 2);
-        return `https://images2.imgbox.com/${firstTwoChars.split('').join('/')}/${id}_o.png`;
     }
     
     // 显示通知
