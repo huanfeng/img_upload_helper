@@ -22,8 +22,10 @@
         #toast-container {
             position: fixed;
             top: 20px;
-            right: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             z-index: 10000;
+            text-align: center;
         }
         
         .toast {
@@ -33,11 +35,11 @@
             border-radius: 4px;
             margin-bottom: 10px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
+            display: inline-block;
             animation: fadeIn 0.3s, fadeOut 0.3s 2.7s;
             opacity: 0;
-            max-width: 300px;
+            min-width: 200px;
+            max-width: 400px;
         }
         
         .toast.success {
@@ -48,6 +50,7 @@
         .toast.error {
             background-color: #f44336;
             border-left: 5px solid #d32f2f;
+            color: white !important;
         }
         
         .toast.info {
@@ -65,29 +68,10 @@
             to {opacity: 0; transform: translateY(-20px);}
         }
         
-        /* 暗色主题样式 */
-        #floating-button {
-            position: fixed;
-            top: 40px;
-            right: 20px;
-            width: 80px;
-            height: 30px;
-            border-radius: 5%;
-            background-color: #4CAF50;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            z-index: 9999;
-            font-size: 12px;
-            transition: all 0.3s ease;
-        }
-        
-        #floating-button:hover {
-            transform: scale(1.1);
-            background-color: #45a049;
+        /* 导航栏助手按钮样式 */
+        .nav.pull-right a[title="打开图片上传助手"]:hover {
+            color: #45a049 !important;
+            text-decoration: underline;
         }
         
         #custom-imgbox-container {
@@ -270,28 +254,43 @@
         }
     });
     
-    // 添加浮动按钮
+    // 将助手按钮添加到导航栏
     function addFloatingButton() {
-        const floatingButton = document.createElement('div');
-        floatingButton.id = 'floating-button';
-        floatingButton.innerHTML = '图片助手';
-        floatingButton.title = '打开图片上传助手';
-        
-        floatingButton.onclick = function() {
-            const container = document.getElementById('custom-imgbox-container');
-            if (container) {
-                if (container.style.display === 'none' || container.style.display === '') {
-                    container.style.display = 'block';
-                } else {
-                    container.style.display = 'none';
-                }
-            } else {
-                addImgboxUI('');
-                document.getElementById('custom-imgbox-container').style.display = 'block';
+        // 等待导航栏加载
+        const waitForNav = setInterval(() => {
+            const navUl = document.querySelector('.nav.pull-right');
+            if (navUl) {
+                clearInterval(waitForNav);
+                
+                // 创建新的导航项
+                const navItem = document.createElement('li');
+                const navLink = document.createElement('a');
+                navLink.href = 'javascript:void(0);';
+                navLink.textContent = '图片助手';
+                navLink.title = '打开图片上传助手';
+                navLink.style.color = '#4CAF50'; // 使其稍微突出
+                
+                navLink.onclick = function(e) {
+                    e.preventDefault();
+                    const customContainer = document.getElementById('custom-imgbox-container');
+                    if (customContainer) {
+                        if (customContainer.style.display === 'none') {
+                            customContainer.style.display = 'block';
+                        } else {
+                            customContainer.style.display = 'none';
+                        }
+                    } else {
+                        // 初次创建界面
+                        addImgboxUI();
+                    }
+                };
+                
+                navItem.appendChild(navLink);
+                
+                // 将导航项添加到导航栏
+                navUl.appendChild(navItem);
             }
-        };
-        
-        document.body.appendChild(floatingButton);
+        }, 100);
     }
     
     // 激活标签页
