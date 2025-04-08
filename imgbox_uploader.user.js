@@ -331,27 +331,6 @@
         customContainer.id = 'custom-imgbox-container';
         customContainer.style.display = 'none'; // 默认隐藏
         
-        // 创建标题
-        const title = document.createElement('h3');
-        title.textContent = '批量图片链接上传助手';
-        customContainer.appendChild(title);
-        
-        // // 创建关闭按钮
-        // const closeButton = document.createElement('button');
-        // closeButton.textContent = '✕';
-        // closeButton.className = 'red-btn';
-        // closeButton.style.cssText = `
-        //     position: absolute;
-        //     top: 10px;
-        //     right: 10px;
-        //     padding: 2px 8px;
-        //     font-size: 16px;
-        // `;
-        // closeButton.onclick = function() {
-        //     customContainer.style.display = 'none';
-        // };
-        // customContainer.appendChild(closeButton);
-        
         // 创建标签页容器
         const tabContainer = document.createElement('div');
         tabContainer.className = 'tab-container';
@@ -422,15 +401,6 @@
         resultArea.id = 'imgbox-results';
         uploadTabContent.appendChild(resultArea);
         
-        // 创建复制按钮
-        const copyButton = document.createElement('button');
-        copyButton.textContent = '复制所有链接';
-        copyButton.type = 'button';
-        copyButton.className = 'blue-btn';
-        copyButton.onclick = function() {
-            copyAllLinks();
-        };
-        uploadTabContent.appendChild(copyButton);
         
         // 创建提取标签内容
         const extractTabContent = document.createElement('div');
