@@ -102,7 +102,7 @@
             color: #fff;
         }
         
-        #custom-imgbox-container button {
+        #custom-imgbox-container button:not(.tab-button) {
             background-color: #4CAF50;
             color: white;
             border: none;
@@ -186,34 +186,62 @@
         .tab-container {
             width: 100%;
             margin-bottom: 15px;
+            border-radius: 5px;
+            overflow: hidden;
+            background-color: #222;
+            border: 1px solid #444;
         }
         
         .tab-buttons {
             display: flex;
-            border-bottom: 1px solid #444;
-            margin-bottom: 15px;
+            background-color: #2a2a2a;
         }
         
         .tab-button {
-            padding: 8px 15px;
-            background-color: #333;
-            color: #ddd;
+            padding: 12px 20px;
+            background-color: #2a2a2a;
             border: none;
+            color: #aaa;
             cursor: pointer;
-            margin-right: 2px;
-            border-radius: 4px 4px 0 0;
+            position: relative;
+            transition: all 0.2s ease;
+            font-weight: bold;
+            flex: 1;
+            text-align: center;
+            border-right: 1px solid #333;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab-button:last-child {
+            border-right: none;
+        }
+        
+        .tab-button:hover {
+            color: white;
+            background-color: #333;
         }
         
         .tab-button.active {
-            background-color: #4CAF50;
             color: white;
+            background-color: #222;
+            border-bottom: none;
+        }
+        
+        .tab-button.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: #4CAF50;
         }
         
         .tab-content {
-            display: none;
-            padding: 10px;
+            padding: 20px;
             background-color: #222;
-            border-radius: 0 0 4px 4px;
+            display: none;
+            border-radius: 0 0 5px 5px;
         }
         
         .tab-content.active {
@@ -297,21 +325,39 @@
     function activateTab(tabId) {
         // 隐藏所有标签内容
         const tabContents = document.querySelectorAll('.tab-content');
-        tabContents.forEach(tab => {
-            tab.classList.remove('active');
+        tabContents.forEach(content => {
+            content.classList.remove('active');
+            content.style.display = 'none';
         });
         
-        // 取消所有标签按钮的激活状态
+        // 重置所有标签按钮样式
         const tabButtons = document.querySelectorAll('.tab-button');
         tabButtons.forEach(button => {
             button.classList.remove('active');
         });
         
-        // 激活选中的标签
-        document.getElementById(tabId).classList.add('active');
-        // 激活对应的按钮
-        const activeButtonIndex = tabId === 'upload-tab' ? 0 : 1;
-        document.querySelectorAll('.tab-button')[activeButtonIndex].classList.add('active');
+        // 激活选中的标签页
+        const selectedTab = document.getElementById(tabId);
+        if (selectedTab) {
+            selectedTab.classList.add('active');
+            selectedTab.style.display = 'block';
+            
+            // 添加渐变动画效果
+            selectedTab.style.opacity = '0';
+            setTimeout(() => {
+                selectedTab.style.opacity = '1';
+            }, 10);
+        }
+        
+        // 激活对应的标签按钮
+        const activeButton = document.querySelector(`.tab-button[data-tab-id="${tabId}"]`) || 
+                             document.querySelector(`.tab-button[onclick*="'${tabId}'"]`);
+        if (activeButton) {
+            activeButton.classList.add('active');
+        }
+        
+        // 将当前标签页ID保存到本地存储
+        GM_setValue('activeTab', tabId);
     }
     
     // 添加Imgbox界面UI
@@ -343,8 +389,9 @@
         
         // 上传标签按钮
         const uploadTabButton = document.createElement('button');
-        uploadTabButton.className = 'tab-button active';
+        uploadTabButton.className = 'tab-button';
         uploadTabButton.textContent = '图片链接上传';
+        uploadTabButton.dataset.tabId = 'upload-tab';
         uploadTabButton.onclick = function() {
             activateTab('upload-tab');
         };
@@ -354,6 +401,7 @@
         const extractTabButton = document.createElement('button');
         extractTabButton.className = 'tab-button';
         extractTabButton.textContent = 'BB代码链接提取';
+        extractTabButton.dataset.tabId = 'extract-tab';
         extractTabButton.onclick = function() {
             activateTab('extract-tab');
         };
@@ -472,6 +520,10 @@
                 processImageLinks(initialLinks);
             }, 1500);
         }
+        
+        // 初始化激活默认标签页
+        const savedTab = GM_getValue('activeTab', 'upload-tab');
+        activateTab(savedTab);
     }
     
     // 处理图片链接
@@ -799,7 +851,7 @@
                 console.error('逐个添加文件也失败:', e);
                 
                 // 尝试使用模拟点击的方式
-                alert('自动添加文件失败，请手动选择已下载的图片文件');
+                showToast('自动添加文件失败，请手动选择已下载的图片文件', 'error');
                 return false;
             }
         }
