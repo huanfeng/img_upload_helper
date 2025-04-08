@@ -419,18 +419,56 @@
         inputLabel.style.marginBottom = '5px';
         uploadTabContent.appendChild(inputLabel);
         
-        const textarea = document.createElement('textarea');
-        textarea.id = 'imgbox-links-input';
-        // 如果有初始链接，填充到文本框
-        textarea.value = initialLinks;
-        uploadTabContent.appendChild(textarea);
+        const linksInput = document.createElement('textarea');
+        linksInput.id = 'imgbox-links-input';
+        linksInput.placeholder = '请输入图片链接，每行一个链接';
+        uploadTabContent.appendChild(linksInput);
+        
+        // 创建格式转换选项
+        const formatContainer = document.createElement('div');
+        formatContainer.className = 'format-container';
+        formatContainer.style.cssText = 'margin: 10px 0; display: flex; align-items: center;';
+        
+        const formatLabel = document.createElement('label');
+        formatLabel.textContent = '图片格式转换: ';
+        formatLabel.style.marginRight = '10px';
+        formatContainer.appendChild(formatLabel);
+        
+        const formatSelect = document.createElement('select');
+        formatSelect.id = 'imgbox-format-select';
+        formatSelect.style.cssText = 'padding: 5px; background-color: #333; color: white; border: 1px solid #444; border-radius: 4px;';
+        
+        const formats = [
+            { value: 'original', text: '保持原始格式' },
+            { value: 'png', text: '转换为 PNG' },
+            { value: 'jpeg', text: '转换为 JPEG' }
+        ];
+        
+        formats.forEach(format => {
+            const option = document.createElement('option');
+            option.value = format.value;
+            option.textContent = format.text;
+            formatSelect.appendChild(option);
+        });
+        
+        // 从本地存储中读取默认格式
+        const savedFormat = GM_getValue('imageFormat', 'original');
+        formatSelect.value = savedFormat;
+        
+        // 保存选择的格式
+        formatSelect.onchange = function() {
+            GM_setValue('imageFormat', this.value);
+        };
+        
+        formatContainer.appendChild(formatSelect);
+        uploadTabContent.appendChild(formatContainer);
         
         // 创建下载按钮
         const downloadButton = document.createElement('button');
         downloadButton.textContent = '下载图片并添加到上传列表';
         downloadButton.type = 'button'; // 防止触发表单提交
         downloadButton.onclick = function() {
-            processImageLinks(textarea.value);
+            processImageLinks(linksInput.value);
         };
         uploadTabContent.appendChild(downloadButton);
         
@@ -712,23 +750,43 @@
                     onload: function(response) {
                         if (response.status >= 200 && response.status < 300) {
                             const blob = response.response;
-                            // 确保文件名是唯一的
-                            const uniqueFileName = `image_${Date.now()}_${Math.floor(Math.random() * 10000)}.png`;
                             
-                            // 如果不是PNG格式，转换为PNG
-                            if (fileType !== 'image/png') {
-                                convertToPng(blob).then(pngBlob => {
-                                    // 创建File对象
-                                    const file = new File([pngBlob], uniqueFileName, { type: 'image/png' });
+                            // 获取用户选择的格式
+                            const formatSelect = document.getElementById('imgbox-format-select');
+                            const selectedFormat = formatSelect ? formatSelect.value : GM_getValue('imageFormat', 'original');
+                            
+                            // 根据选择的格式处理图片
+                            if (selectedFormat === 'original') {
+                                // 保持原始格式
+                                const uniqueFileName = `image_${Date.now()}_${Math.floor(Math.random() * 10000)}.${fileType.split('/')[1]}`;
+                                const file = new File([blob], uniqueFileName, { type: blob.type || fileType });
+                                resolve(file);
+                            } else if (selectedFormat === 'png' && fileType !== 'image/png') {
+                                // 转换为 PNG
+                                const uniqueFileName = `image_${Date.now()}_${Math.floor(Math.random() * 10000)}.png`;
+                                convertToFormat(blob, 'image/png').then(convertedBlob => {
+                                    const file = new File([convertedBlob], uniqueFileName, { type: 'image/png' });
                                     resolve(file);
                                 }).catch(err => {
-                                    // 如果转换失败，使用原始格式
-                                    console.warn('PNG转换失败，使用原始格式:', err);
-                                    const file = new File([blob], uniqueFileName.replace('.png', '.jpg'), { type: blob.type || fileType });
+                                    console.warn('格式转换失败，使用原始格式:', err);
+                                    const file = new File([blob], uniqueFileName.replace('.png', `.${fileType.split('/')[1]}`), { type: blob.type || fileType });
+                                    resolve(file);
+                                });
+                            } else if (selectedFormat === 'jpeg' && fileType !== 'image/jpeg') {
+                                // 转换为 JPEG
+                                const uniqueFileName = `image_${Date.now()}_${Math.floor(Math.random() * 10000)}.jpg`;
+                                convertToFormat(blob, 'image/jpeg').then(convertedBlob => {
+                                    const file = new File([convertedBlob], uniqueFileName, { type: 'image/jpeg' });
+                                    resolve(file);
+                                }).catch(err => {
+                                    console.warn('格式转换失败，使用原始格式:', err);
+                                    const file = new File([blob], uniqueFileName.replace('.jpg', `.${fileType.split('/')[1]}`), { type: blob.type || fileType });
                                     resolve(file);
                                 });
                             } else {
-                                // 已经是PNG格式
+                                // 已经是所需格式或其他情况
+                                const ext = selectedFormat === 'png' ? 'png' : (selectedFormat === 'jpeg' ? 'jpg' : fileType.split('/')[1]);
+                                const uniqueFileName = `image_${Date.now()}_${Math.floor(Math.random() * 10000)}.${ext}`;
                                 const file = new File([blob], uniqueFileName, { type: blob.type || fileType });
                                 resolve(file);
                             }
@@ -746,8 +804,8 @@
         });
     }
     
-    // 转换图片为PNG格式
-    function convertToPng(imageBlob) {
+    // 通用图片格式转换函数
+    function convertToFormat(imageBlob, targetFormat) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
@@ -756,15 +814,25 @@
                     canvas.width = img.width;
                     canvas.height = img.height;
                     const ctx = canvas.getContext('2d');
+                    
+                    // 如果转换为 JPEG，设置白色背景（因为 JPEG 不支持透明度）
+                    if (targetFormat === 'image/jpeg') {
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    }
+                    
                     ctx.drawImage(img, 0, 0);
+                    
+                    // 设置 JPEG 转换质量
+                    const quality = targetFormat === 'image/jpeg' ? 0.92 : null;
                     
                     canvas.toBlob(blob => {
                         if (blob) {
                             resolve(blob);
                         } else {
-                            reject(new Error('无法从画布创建PNG Blob'));
+                            reject(new Error(`无法从画布创建 ${targetFormat} Blob`));
                         }
-                    }, 'image/png');
+                    }, targetFormat, quality);
                 } catch (e) {
                     reject(e);
                 }
@@ -773,41 +841,6 @@
             img.onerror = () => reject(new Error('图片加载失败'));
             img.src = URL.createObjectURL(imageBlob);
         });
-    }
-    
-    // 将文件添加到文件输入框
-    function addFileToInput(fileInput, file) {
-        try {
-            // 创建一个DataTransfer对象
-            const dataTransfer = new DataTransfer();
-            
-            // 添加现有文件
-            if (fileInput.files) {
-                for (let i = 0; i < fileInput.files.length; i++) {
-                    dataTransfer.items.add(fileInput.files[i]);
-                }
-            }
-            
-            // 添加新文件
-            dataTransfer.items.add(file);
-            
-            // 设置文件输入的files属性
-            fileInput.files = dataTransfer.files;
-            
-            // 触发change事件
-            const event = new Event('change', { bubbles: true });
-            fileInput.dispatchEvent(event);
-        } catch (error) {
-            console.error('添加文件到输入框失败:', error);
-            // 尝试直接设置文件
-            try {
-                const newFiles = [file];
-                fileInput.files = newFiles;
-                fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-            } catch (e) {
-                console.error('直接设置文件也失败:', e);
-            }
-        }
     }
     
     // 批量添加文件到输入框
@@ -929,21 +962,6 @@
         // 这里需要根据imgbox的实际URL格式进行调整
         const firstTwoChars = id.substring(0, 2);
         return `https://images2.imgbox.com/${firstTwoChars.split('').join('/')}/${id}_o.png`;
-    }
-    
-    // 复制所有链接
-    function copyAllLinks() {
-        const resultArea = document.getElementById('imgbox-results');
-        if (!resultArea) return;
-        
-        const links = Array.from(resultArea.querySelectorAll('a')).map(a => a.href);
-        
-        if (links.length === 0) {
-            showToast('没有可复制的链接！', 'error');
-            return;
-        }
-        
-        copyToClipboard(links.join('\n'));
     }
     
     // 显示通知
