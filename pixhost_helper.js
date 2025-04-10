@@ -377,7 +377,7 @@
         window.extractedLinks = matches;
     }
     
-    // 自动从当前页面提取 BB 代码
+    // 自动从当前页面提取图片直链
     function autoExtractFromPage() {
         // 尝试查找页面上的 BB 代码输入框
         const bbInput = document.querySelector('input.bb[type="text"]');
@@ -389,7 +389,7 @@
                 bbcodeInput.value = bbInput.value;
                 // 自动提取直链
                 extractDirectLinks(bbInput.value);
-                showToast('已自动提取当前页面的 BB 代码', 'success');
+                showToast('已自动提取当前页面的图片直链', 'success');
             }
         } else {
             // 如果没有找到 BB 代码输入框，尝试查找画廊元素
@@ -413,7 +413,7 @@
                         bbcodeInput.value = bbcode;
                         // 自动提取直链
                         extractDirectLinks(bbcode);
-                        showToast('已自动构建并提取当前页面的 BB 代码', 'success');
+                        showToast('已自动构建并提取当前页面的图片直链', 'success');
                     }
                 } else {
                     showToast('当前页面没有找到可用的图片元素', 'error');

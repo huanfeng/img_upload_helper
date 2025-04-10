@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Imgbox图片上传助手增强版
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.6
 // @description  给 imgbox 添加在线链接上传功能, 支持图片格式转换, 添加直链获取功能
 // @author       huanfeng
 // @match        *://imgbox.com/*
@@ -524,6 +524,34 @@
         formatContainer.appendChild(formatSelect);
         uploadTabContent.appendChild(formatContainer);
         
+        // 创建自动上传选项
+        const autoUploadContainer = document.createElement('div');
+        autoUploadContainer.className = 'auto-upload-container';
+        autoUploadContainer.style.cssText = 'margin: 10px 0; display: flex; align-items: center;';
+        
+        const autoUploadCheckbox = document.createElement('input');
+        autoUploadCheckbox.type = 'checkbox';
+        autoUploadCheckbox.id = 'imgbox-auto-upload';
+        autoUploadCheckbox.style.marginRight = '5px';
+        
+        // 从本地存储中读取自动上传设置
+        const autoUploadEnabled = GM_getValue('autoUpload', false);
+        autoUploadCheckbox.checked = autoUploadEnabled;
+        
+        // 保存自动上传设置
+        autoUploadCheckbox.onchange = function() {
+            GM_setValue('autoUpload', this.checked);
+        };
+        
+        const autoUploadLabel = document.createElement('label');
+        autoUploadLabel.textContent = '自动上传';
+        autoUploadLabel.htmlFor = 'imgbox-auto-upload';
+        autoUploadLabel.style.cursor = 'pointer';
+        
+        autoUploadContainer.appendChild(autoUploadCheckbox);
+        autoUploadContainer.appendChild(autoUploadLabel);
+        uploadTabContent.appendChild(autoUploadContainer);
+        
         // 创建按钮容器
         const uploadButtonContainer = document.createElement('div');
         uploadButtonContainer.style.cssText = 'display: flex; gap: 10px; margin-top: 10px;';
@@ -758,6 +786,13 @@
         
         // 显示提取结果
         extractedLinksArea.style.display = 'block';
+        
+        // 如果开启了自动上传模式，自动复制直链
+        if (GM_getValue('autoUpload', false)) {
+            setTimeout(() => {
+                copyExtractedLinks();
+            }, 500);
+        }
     }
     
     // 从页面获取BB代码
@@ -952,6 +987,29 @@
             // 触发change事件
             const event = new Event('change', { bubbles: true });
             fileInput.dispatchEvent(event);
+            
+            // 检查是否需要自动上传
+            const autoUploadEnabled = GM_getValue('autoUpload', false);
+            if (autoUploadEnabled) {
+                // 检查是否有超大文件
+                const hasOversizedFiles = files.some(file => file.size > 10 * 1024 * 1024);
+                
+                if (hasOversizedFiles) {
+                    showToast('检测到有文件超过10MB，已取消自动上传', 'warning');
+                    console.warn('取消自动上传：有文件超过10MB');
+                } else {
+                    // 查找上传按钮并模拟点击
+                    setTimeout(() => {
+                        const uploadButton = document.querySelector('button#fake-submit-button');
+                        if (uploadButton) {
+                            uploadButton.click();
+                            showToast('已自动开始上传', 'info');
+                        } else {
+                            console.log('上传按钮不可用或未找到');
+                        }
+                    }, 1000); // 等待一秒确保文件已添加到队列
+                }
+            }
             
             return true;
         } catch (error) {
