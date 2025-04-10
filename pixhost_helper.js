@@ -4,7 +4,7 @@
 // @version      0.1
 // @description  给 pixhost 添加在线链接上传功能, 支持图片格式转换
 // @author       huanfeng
-// @match        *://pixhost.to/*
+// @match        *://pixhost.to/
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -222,6 +222,7 @@
                 const navItem = document.createElement('li');
                 const navLink = document.createElement('a');
                 navLink.href = 'javascript:void(0);';
+                navLink.id = 'pixhost-helper-link';
                 
                 // 创建图标
                 const icon = document.createElement('span');
@@ -236,26 +237,11 @@
                 navLink.appendChild(icon);
                 navLink.appendChild(document.createTextNode('图片助手'));
                 navLink.title = '打开图片上传助手';
-                navLink.style.color = '#ff9800'; // 使其稍微突出
+                navLink.style.color = uiVisible ? '#ff9800' : '#999';
                 
                 navLink.onclick = function(e) {
                     e.preventDefault();
-                    const customContainer = document.getElementById('custom-pixhost-container');
-                    if (customContainer) {
-                        // 切换显示状态
-                        const newDisplayState = customContainer.style.display === 'none' ? 'block' : 'none';
-                        customContainer.style.display = newDisplayState;
-                        
-                        // 保存状态
-                        GM_setValue('uiVisible', newDisplayState === 'block');
-                        
-                        // 更新图标颜色
-                        navLink.style.color = newDisplayState === 'block' ? '#ff9800' : '#999';
-                    } else {
-                        // 初次创建界面
-                        addPixhostUI();
-                        GM_setValue('uiVisible', true);
-                    }
+                    toggleHelperUI();
                 };
                 
                 navItem.appendChild(navLink);
@@ -263,19 +249,38 @@
                 // 将导航项添加到导航栏
                 navUl.appendChild(navItem);
                 
-                // 根据保存的UI状态设置导航栏图标颜色
-                if (uiVisible) {
-                    navLink.style.color = '#ff9800';
-                } else {
-                    navLink.style.color = '#999';
-                }
-                
                 // 如果之前设置了显示，则自动创建界面
                 if (uiVisible) {
+                    // 直接创建 UI，不等待点击
                     addPixhostUI();
                 }
             }
         }, 100);
+    }
+    
+    // 切换助手 UI 显示状态
+    function toggleHelperUI() {
+        let customContainer = document.getElementById('custom-uploader-container');
+        const helperLink = document.getElementById('pixhost-helper-link');
+        
+        if (!customContainer) {
+            // 如果容器不存在，创建它
+            addPixhostUI();
+            customContainer = document.getElementById('custom-uploader-container');
+            if (customContainer) {
+                customContainer.style.display = 'block';
+                if (helperLink) helperLink.style.color = '#ff9800';
+                GM_setValue('uiVisible', true);
+            }
+        } else {
+            // 如果容器已存在，切换其显示状态
+            const newDisplayState = customContainer.style.display === 'none' ? 'block' : 'none';
+            customContainer.style.display = newDisplayState;
+            
+            // 更新图标颜色和保存状态
+            if (helperLink) helperLink.style.color = newDisplayState === 'block' ? '#ff9800' : '#999';
+            GM_setValue('uiVisible', newDisplayState === 'block');
+        }
     }
     
     // 激活标签页
@@ -714,6 +719,34 @@
         formatContainer.appendChild(formatSelect);
         uploadTabContent.appendChild(formatContainer);
         
+        // 创建自动上传选项
+        const autoUploadContainer = document.createElement('div');
+        autoUploadContainer.className = 'auto-upload-container';
+        autoUploadContainer.style.cssText = 'margin: 10px 0; display: flex; align-items: center;';
+        
+        const autoUploadCheckbox = document.createElement('input');
+        autoUploadCheckbox.type = 'checkbox';
+        autoUploadCheckbox.id = 'pixhost-auto-upload';
+        autoUploadCheckbox.style.marginRight = '5px';
+        
+        // 从本地存储中读取自动上传设置
+        const autoUploadEnabled = GM_getValue('autoUpload', false);
+        autoUploadCheckbox.checked = autoUploadEnabled;
+        
+        // 保存自动上传设置
+        autoUploadCheckbox.onchange = function() {
+            GM_setValue('autoUpload', this.checked);
+        };
+        
+        const autoUploadLabel = document.createElement('label');
+        autoUploadLabel.textContent = '自动上传';
+        autoUploadLabel.htmlFor = 'pixhost-auto-upload';
+        autoUploadLabel.style.cursor = 'pointer';
+        
+        autoUploadContainer.appendChild(autoUploadCheckbox);
+        autoUploadContainer.appendChild(autoUploadLabel);
+        uploadTabContent.appendChild(autoUploadContainer);
+        
         // 创建按钮容器
         const uploadButtonContainer = document.createElement('div');
         uploadButtonContainer.style.cssText = 'display: flex; gap: 10px; margin-top: 10px;';
@@ -872,6 +905,21 @@
                         const defaultName = `Gallery_${today.getFullYear()}-${(today.getMonth()+1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
                         galleryNameInput.value = defaultName;
                         galleryNameInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    
+                    // 检查是否需要自动上传
+                    const autoUploadEnabled = GM_getValue('autoUpload', false);
+                    if (autoUploadEnabled) {
+                        // 查找上传按钮并模拟点击
+                        setTimeout(() => {
+                            const uploadButton = document.querySelector('#newuploader_start, .plupload_start');
+                            if (uploadButton && !uploadButton.classList.contains('ui-state-disabled')) {
+                                uploadButton.click();
+                                showToast('已自动开始上传', 'info');
+                            } else {
+                                console.log('上传按钮不可用或未找到');
+                            }
+                        }, 1000); // 等待一秒确保文件已添加到队列
                     }
                 } catch (e) {
                     console.error('设置上传选项时出错:', e);
