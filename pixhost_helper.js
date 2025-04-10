@@ -364,6 +364,13 @@
         if (copyDirectLinksButton) copyDirectLinksButton.style.display = 'block';
         if (copyBBCodeButton) copyBBCodeButton.style.display = 'block';
         
+        // 自动复制直链
+        if (copyDirectLinksButton && GM_getValue('autoUpload', false)) {
+            setTimeout(() => {
+                copyDirectLinksButton.click();
+            }, 500);
+        }
+        
         showToast(`已提取并转换 ${matches.length} 个图片直链`, 'success');
         
         // 将提取结果保存到全局变量中，便于后续复制
@@ -696,12 +703,11 @@
         
         const formats = [
             { value: 'original', text: '保持原始格式' },
-            { value: 'png-high', text: '转换为 PNG (高质量)' },
-            { value: 'png-medium', text: '转换为 PNG (中质量)' },
-            { value: 'png-low', text: '转换为 PNG (低质量)' },
-            { value: 'jpeg-high', text: '转换为 JPEG (高质量)' },
-            { value: 'jpeg-medium', text: '转换为 JPEG (中质量)' },
-            { value: 'jpeg-low', text: '转换为 JPEG (低质量)' }
+            { value: 'png-lossless', text: '转换为 PNG (无损压缩)' },
+            { value: 'png-8bit', text: '转换为 PNG (8位色彩)' },
+            { value: 'jpeg-high', text: '转换为 JPEG (95%)' },
+            { value: 'jpeg-medium', text: '转换为 JPEG (85%)' },
+            { value: 'jpeg-low', text: '转换为 JPEG (75%)' }
         ];
         
         formats.forEach(format => {
@@ -914,16 +920,24 @@
                     // 检查是否需要自动上传
                     const autoUploadEnabled = GM_getValue('autoUpload', false);
                     if (autoUploadEnabled) {
-                        // 查找上传按钮并模拟点击
-                        setTimeout(() => {
-                            const uploadButton = document.querySelector('#newuploader_start, .plupload_start');
-                            if (uploadButton && !uploadButton.classList.contains('ui-state-disabled')) {
-                                uploadButton.click();
-                                showToast('已自动开始上传', 'info');
-                            } else {
-                                console.log('上传按钮不可用或未找到');
-                            }
-                        }, 1000); // 等待一秒确保文件已添加到队列
+                        // 检查是否有超大文件
+                        const hasOversizedFiles = files.some(file => file.oversized === true);
+                        
+                        if (hasOversizedFiles) {
+                            showToast('检测到有文件超过10MB，已取消自动上传', 'warning');
+                            console.warn('取消自动上传：有文件超过10MB');
+                        } else {
+                            // 查找上传按钮并模拟点击
+                            setTimeout(() => {
+                                const uploadButton = document.querySelector('#newuploader_start, .plupload_start');
+                                if (uploadButton && !uploadButton.classList.contains('ui-state-disabled')) {
+                                    uploadButton.click();
+                                    showToast('已自动开始上传', 'info');
+                                } else {
+                                    console.log('上传按钮不可用或未找到');
+                                }
+                            }, 1000); // 等待一秒确保文件已添加到队列
+                        }
                     }
                 } catch (e) {
                     console.error('设置上传选项时出错:', e);
@@ -1006,6 +1020,9 @@
                                 if (blob.size > 10 * 1024 * 1024) { // 大于10MB
                                     console.warn(`图片转换后大小为 ${(blob.size / (1024 * 1024)).toFixed(2)}MB，超过Pixhost限制`);
                                     showToast(`警告: 图片大小为 ${(blob.size / (1024 * 1024)).toFixed(2)}MB，超过10MB限制，可能上传失败`, 'warning');
+                                    
+                                    // 如果文件超过10MB，设置标记以阻止自动上传
+                                    file.oversized = true;
                                 }
                             } catch (error) {
                                 console.error('格式转换失败:', error);
@@ -1043,22 +1060,9 @@
                     const formatSelect = document.getElementById('pixhost-format-select');
                     const selectedFormat = formatSelect ? formatSelect.value : 'original';
                     
-                    // 处理大尺寸图片，如果是4K或更大，考虑缩小
-                    let scale = 1;
-                    const isLargeImage = img.width > 3000 || img.height > 3000;
-                    
-                    // 如果是低质量选项且是大尺寸图片，缩小到原尺寸的50%
-                    if (selectedFormat.includes('-low') && isLargeImage) {
-                        scale = 0.5;
-                    }
-                    // 如果是中质量选项且是大尺寸图片，缩小到原尺寸的75%
-                    else if (selectedFormat.includes('-medium') && isLargeImage) {
-                        scale = 0.75;
-                    }
-                    
-                    // 设置画布尺寸
-                    canvas.width = img.width * scale;
-                    canvas.height = img.height * scale;
+                    // 保持原始尺寸
+                    canvas.width = img.width;
+                    canvas.height = img.height;
                     const ctx = canvas.getContext('2d');
                     
                     // 如果转换为 JPEG，设置白色背景（因为 JPEG 不支持透明度）
@@ -1067,8 +1071,8 @@
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
                     }
                     
-                    // 绘制图片，应用缩放
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    // 绘制图片，保持原始尺寸
+                    ctx.drawImage(img, 0, 0);
                     
                     // 设置转换质量
                     let quality = null;
@@ -1076,28 +1080,49 @@
                     if (targetFormat === 'image/jpeg') {
                         // JPEG 质量设置
                         if (selectedFormat === 'jpeg-high') {
-                            quality = 0.92;
+                            quality = 0.95;
                         } else if (selectedFormat === 'jpeg-medium') {
                             quality = 0.85;
                         } else if (selectedFormat === 'jpeg-low') {
                             quality = 0.75;
                         }
                     } else if (targetFormat === 'image/png') {
-                        // PNG 质量设置
+                        // PNG 质量设置 - 使用颜色量化来减小文件大小
                         // 注意：canvas.toBlob 对 PNG 的 quality 参数没有标准实现
-                        // 我们通过缩放和颜色量化来控制 PNG 大小
                         
-                        // 对于低质量 PNG，使用颜色量化来减小文件大小
-                        if (selectedFormat === 'png-low') {
-                            // 将图像量化为更少的颜色
+                        // 如果是8位色彩模式，使用颜色量化到256色
+                        if (selectedFormat === 'png-8bit') {
                             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                             const data = imageData.data;
                             
-                            // 简单的颜色量化，将颜色值调整为16的倍数
+                            // 将颜色量化为8位颜色（每个通道只有256/8=32个可能的值）
                             for (let i = 0; i < data.length; i += 4) {
-                                data[i] = Math.round(data[i] / 16) * 16;     // R
-                                data[i + 1] = Math.round(data[i + 1] / 16) * 16; // G
-                                data[i + 2] = Math.round(data[i + 2] / 16) * 16; // B
+                                // 使用位运算来加速计算，相当于除以8然后乘3
+                                data[i] = (data[i] >> 3) << 3;     // R
+                                data[i + 1] = (data[i + 1] >> 3) << 3; // G
+                                data[i + 2] = (data[i + 2] >> 3) << 3; // B
+                            }
+                            
+                            ctx.putImageData(imageData, 0, 0);
+                        }
+                        // 如果是4位色彩模式，使用颜色量化到16色
+                        else if (selectedFormat === 'png-4bit') {
+                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            const data = imageData.data;
+                            
+                            // 将颜色量化为4位颜色（每个通道只有4个可能的值）
+                            for (let i = 0; i < data.length; i += 4) {
+                                // 使用位运算来加速计算，相当于除以64然后乘64
+                                data[i] = (data[i] >> 6) << 6;     // R
+                                data[i + 1] = (data[i + 1] >> 6) << 6; // G
+                                data[i + 2] = (data[i + 2] >> 6) << 6; // B
+                                
+                                // 对于非完全透明的像素，将透明度也量化为二值（完全透明或完全不透明）
+                                if (data[i + 3] < 128) {
+                                    data[i + 3] = 0; // 完全透明
+                                } else {
+                                    data[i + 3] = 255; // 完全不透明
+                                }
                             }
                             
                             ctx.putImageData(imageData, 0, 0);
