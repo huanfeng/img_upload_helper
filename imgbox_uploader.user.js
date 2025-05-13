@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Imgbox图片上传助手增强版
 // @namespace    http://tampermonkey.net/
-// @version      0.6
+// @version      0.7
 // @description  给 imgbox 添加在线链接上传功能, 支持图片格式转换, 添加直链获取功能
 // @author       huanfeng
 // @match        *://imgbox.com/*

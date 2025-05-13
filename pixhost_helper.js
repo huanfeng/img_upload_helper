@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pixhost图片上传助手
 // @namespace    [http://tampermonkey.net/](http://tampermonkey.net/)
-// @version      0.1
+// @version      0.2
 // @description  给 pixhost 添加在线链接上传功能, 支持图片格式转换
 // @author       huanfeng
 // @match        *://pixhost.to/
