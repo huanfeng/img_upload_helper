@@ -11,7 +11,7 @@
 // @grant        unsafeWindow
 // @grant        GM_addStyle
 // @connect      *
-// @homepage     https://github.com/huanfeng/imgbox_upload_helper
+// @homepage     https://github.com/huanfeng/img_upload_helper
 // @license MIT
 // ==/UserScript==
 
