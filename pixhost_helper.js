@@ -1053,32 +1053,114 @@
             const img = new Image();
             img.onload = () => {
                 try {
-                    // 创建画布
-                    const canvas = document.createElement('canvas');
-                    
                     // 获取选择的格式
                     const formatSelect = document.getElementById('pixhost-format-select');
                     const selectedFormat = formatSelect ? formatSelect.value : 'original';
                     
-                    // 保持原始尺寸
+                    // 创建画布
+                    const canvas = document.createElement('canvas');
                     canvas.width = img.width;
                     canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
                     
-                    // 如果转换为 JPEG，设置白色背景（因为 JPEG 不支持透明度）
-                    if (targetFormat === 'image/jpeg') {
+                    // PNG 格式处理
+                    if (targetFormat === 'image/png') {
+                        // 默认使用 24 位色彩深度（无 Alpha 通道）
+                        if (selectedFormat === 'png-lossless' || selectedFormat === 'original') {
+                            // 创建一个不带透明度的上下文
+                            const ctx = canvas.getContext('2d', { alpha: false });
+                            // 设置白色背景（对于有透明度的区域）
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            // 绘制图片
+                            ctx.drawImage(img, 0, 0);
+                            
+                            // 生成 24 位 PNG
+                            canvas.toBlob(blob => {
+                                if (blob) {
+                                    resolve(blob);
+                                } else {
+                                    reject(new Error(`无法从画布创建 24位 PNG Blob`));
+                                }
+                            }, targetFormat);
+                        }
+                        // 8位色彩模式处理
+                        else if (selectedFormat === 'png-8bit') {
+                            // 创建一个不带透明度的上下文
+                            const ctx = canvas.getContext('2d', { alpha: false });
+                            // 设置白色背景
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            // 绘制图片
+                            ctx.drawImage(img, 0, 0);
+                            
+                            // 进行 8 位颜色量化
+                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            const data = imageData.data;
+                            
+                            for (let i = 0; i < data.length; i += 4) {
+                                // 使用位运算来加速计算，相当于除以8然后乘3
+                                data[i] = (data[i] >> 3) << 3;     // R
+                                data[i + 1] = (data[i + 1] >> 3) << 3; // G
+                                data[i + 2] = (data[i + 2] >> 3) << 3; // B
+                                // 因为使用了 alpha: false，这里的 Alpha 通道实际上不会被使用
+                            }
+                            
+                            ctx.putImageData(imageData, 0, 0);
+                            
+                            // 生成 8 位 PNG
+                            canvas.toBlob(blob => {
+                                if (blob) {
+                                    resolve(blob);
+                                } else {
+                                    reject(new Error(`无法从画布创建 8位 PNG Blob`));
+                                }
+                            }, targetFormat);
+                        }
+                        // 4位色彩模式处理
+                        else if (selectedFormat === 'png-4bit') {
+                            // 创建一个不带透明度的上下文
+                            const ctx = canvas.getContext('2d', { alpha: false });
+                            // 设置白色背景
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            // 绘制图片
+                            ctx.drawImage(img, 0, 0);
+                            
+                            // 进行 4 位颜色量化
+                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            const data = imageData.data;
+                            
+                            for (let i = 0; i < data.length; i += 4) {
+                                // 使用位运算来加速计算，相当于除以64然后乘64
+                                data[i] = (data[i] >> 6) << 6;     // R
+                                data[i + 1] = (data[i + 1] >> 6) << 6; // G
+                                data[i + 2] = (data[i + 2] >> 6) << 6; // B
+                                // 因为使用了 alpha: false，这里的 Alpha 通道实际上不会被使用
+                            }
+                            
+                            ctx.putImageData(imageData, 0, 0);
+                            
+                            // 生成 4 位 PNG
+                            canvas.toBlob(blob => {
+                                if (blob) {
+                                    resolve(blob);
+                                } else {
+                                    reject(new Error(`无法从画布创建 4位 PNG Blob`));
+                                }
+                            }, targetFormat);
+                        }
+                    }
+                    // JPEG 格式处理
+                    else if (targetFormat === 'image/jpeg') {
+                        const ctx = canvas.getContext('2d');
+                        // JPEG 不支持透明度，设置白色背景
                         ctx.fillStyle = '#FFFFFF';
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    }
-                    
-                    // 绘制图片，保持原始尺寸
-                    ctx.drawImage(img, 0, 0);
-                    
-                    // 设置转换质量
-                    let quality = null;
-                    
-                    if (targetFormat === 'image/jpeg') {
-                        // JPEG 质量设置
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // 设置 JPEG 转换质量
+                        let quality = 0.92; // 默认质量
+                        
                         if (selectedFormat === 'jpeg-high') {
                             quality = 0.95;
                         } else if (selectedFormat === 'jpeg-medium') {
@@ -1086,56 +1168,28 @@
                         } else if (selectedFormat === 'jpeg-low') {
                             quality = 0.75;
                         }
-                    } else if (targetFormat === 'image/png') {
-                        // PNG 质量设置 - 使用颜色量化来减小文件大小
-                        // 注意：canvas.toBlob 对 PNG 的 quality 参数没有标准实现
                         
-                        // 如果是8位色彩模式，使用颜色量化到256色
-                        if (selectedFormat === 'png-8bit') {
-                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                            const data = imageData.data;
-                            
-                            // 将颜色量化为8位颜色（每个通道只有256/8=32个可能的值）
-                            for (let i = 0; i < data.length; i += 4) {
-                                // 使用位运算来加速计算，相当于除以8然后乘3
-                                data[i] = (data[i] >> 3) << 3;     // R
-                                data[i + 1] = (data[i + 1] >> 3) << 3; // G
-                                data[i + 2] = (data[i + 2] >> 3) << 3; // B
+                        canvas.toBlob(blob => {
+                            if (blob) {
+                                resolve(blob);
+                            } else {
+                                reject(new Error(`无法从画布创建 JPEG Blob`));
                             }
-                            
-                            ctx.putImageData(imageData, 0, 0);
-                        }
-                        // 如果是4位色彩模式，使用颜色量化到16色
-                        else if (selectedFormat === 'png-4bit') {
-                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                            const data = imageData.data;
-                            
-                            // 将颜色量化为4位颜色（每个通道只有4个可能的值）
-                            for (let i = 0; i < data.length; i += 4) {
-                                // 使用位运算来加速计算，相当于除以64然后乘64
-                                data[i] = (data[i] >> 6) << 6;     // R
-                                data[i + 1] = (data[i + 1] >> 6) << 6; // G
-                                data[i + 2] = (data[i + 2] >> 6) << 6; // B
-                                
-                                // 对于非完全透明的像素，将透明度也量化为二值（完全透明或完全不透明）
-                                if (data[i + 3] < 128) {
-                                    data[i + 3] = 0; // 完全透明
-                                } else {
-                                    data[i + 3] = 255; // 完全不透明
-                                }
-                            }
-                            
-                            ctx.putImageData(imageData, 0, 0);
-                        }
+                        }, targetFormat, quality);
                     }
-                    
-                    canvas.toBlob(blob => {
-                        if (blob) {
-                            resolve(blob);
-                        } else {
-                            reject(new Error(`无法从画布创建 ${targetFormat} Blob`));
-                        }
-                    }, targetFormat, quality);
+                    // 其他格式处理
+                    else {
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        
+                        canvas.toBlob(blob => {
+                            if (blob) {
+                                resolve(blob);
+                            } else {
+                                reject(new Error(`无法从画布创建 ${targetFormat} Blob`));
+                            }
+                        }, targetFormat);
+                    }
                 } catch (e) {
                     reject(e);
                 }

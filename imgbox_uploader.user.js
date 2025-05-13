@@ -940,26 +940,58 @@
                     const canvas = document.createElement('canvas');
                     canvas.width = img.width;
                     canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
                     
-                    // 如果转换为 JPEG，设置白色背景（因为 JPEG 不支持透明度）
-                    if (targetFormat === 'image/jpeg') {
+                    // 如果是 PNG 格式，默认使用 24 位色彩深度（无 Alpha 通道）
+                    if (targetFormat === 'image/png') {
+                        // 创建一个不带透明度的上下文
+                        const ctx = canvas.getContext('2d', { alpha: false });
+                        // 设置白色背景（对于有透明度的区域）
                         ctx.fillStyle = '#FFFFFF';
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        // 绘制图片
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // 生成 24 位 PNG
+                        canvas.toBlob(blob => {
+                            if (blob) {
+                                resolve(blob);
+                            } else {
+                                reject(new Error(`无法从画布创建 24位 PNG Blob`));
+                            }
+                        }, targetFormat);
+                    } 
+                    // 如果是 JPEG 格式
+                    else if (targetFormat === 'image/jpeg') {
+                        // JPEG 不支持透明度，所以使用白色背景
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // 设置 JPEG 转换质量
+                        const quality = 0.92;
+                        
+                        canvas.toBlob(blob => {
+                            if (blob) {
+                                resolve(blob);
+                            } else {
+                                reject(new Error(`无法从画布创建 JPEG Blob`));
+                            }
+                        }, targetFormat, quality);
                     }
-                    
-                    ctx.drawImage(img, 0, 0);
-                    
-                    // 设置 JPEG 转换质量
-                    const quality = targetFormat === 'image/jpeg' ? 0.92 : null;
-                    
-                    canvas.toBlob(blob => {
-                        if (blob) {
-                            resolve(blob);
-                        } else {
-                            reject(new Error(`无法从画布创建 ${targetFormat} Blob`));
-                        }
-                    }, targetFormat, quality);
+                    // 其他格式或原始格式
+                    else {
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        
+                        canvas.toBlob(blob => {
+                            if (blob) {
+                                resolve(blob);
+                            } else {
+                                reject(new Error(`无法从画布创建 ${targetFormat} Blob`));
+                            }
+                        }, targetFormat);
+                    }
                 } catch (e) {
                     reject(e);
                 }
